@@ -12,13 +12,14 @@ class ServoReaderNode:
         self.pub = rospy.Publisher('/servo_angles', Float64MultiArray, queue_size=10)
         self.rate = rospy.Rate(50)
         self.SERIAL_PORT = '/dev/ttyUSB0'
+        self.servo_ids = list(range(8))
 
         self.BAUDRATE = rospy.get_param("~baudrate", 115200)
         self.ser = serial.Serial(self.SERIAL_PORT, self.BAUDRATE, timeout=0.1)
         rospy.loginfo("Serial port opened")
 
         self.gripper_range = 0.48
-        self.zero_angles = [0.0] * 7
+        self.zero_angles = [0.0] * len(self.servo_ids)
         self._init_servos()
 
     def send_command(self, cmd):
@@ -37,7 +38,7 @@ class ServoReaderNode:
 
     def _init_servos(self):
         self.send_command('#000PVER!')
-        for i in range(7):
+        for i in self.servo_ids:
             self.send_command("#000PCSK!")
             self.send_command(f'#{i:03d}PULK!')
             response = self.send_command(f'#{i:03d}PRAD!')
@@ -46,14 +47,14 @@ class ServoReaderNode:
         rospy.loginfo("Servo initial angle calibration completed")
 
     def run(self):
-        angle_offset = [0.0] * 7  # Currently published angles
-        target_angle_offset = [0.0] * 7  # Target angle for each servo
+        angle_offset = [0.0] * len(self.servo_ids)  # Currently published angles
+        target_angle_offset = [0.0] * len(self.servo_ids)  # Target angle for each servo
         num_interp = 5  # Interpolation steps
         step_size = 1  # Minimum change threshold
         danger_thres = 90
 
         while not rospy.is_shutdown():
-            for i in range(7):
+            for i in self.servo_ids:
                 response = self.send_command(f'#{i:03d}PRAD!')
                 angle = self.pwm_to_angle(response.strip())
                 if angle is not None:
@@ -67,7 +68,7 @@ class ServoReaderNode:
 
             # Interpolate to approach target angle
             for step in range(num_interp):
-                for i in range(7):
+                for i in self.servo_ids:
                     delta = target_angle_offset[i] - angle_offset[i]
                     angle_offset[i] += delta * 0.2  # Lazy interpolation, coefficient < 1 for adjustable smoothness
                 self.pub.publish(Float64MultiArray(data=angle_offset))

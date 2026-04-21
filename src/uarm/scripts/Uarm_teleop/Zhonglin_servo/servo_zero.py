@@ -3,13 +3,14 @@ import time
 import numpy as np
 import re
 
-init_qpos = np.array([14.1, -8, -24.7, 196.9, 62.3, -8.8, 0.0])
+init_qpos = np.array([0, 0, 0, 0, 0, 0, 0, 0])  # Initial joint angles in degrees
 init_qpos = np.radians(init_qpos)
 
 
 # Set serial port parameters
 SERIAL_PORT = '/dev/ttyUSB0'
 BAUDRATE = 115200
+SERVO_IDS = list(range(8))
 
 def send_command(ser, cmd):
     ser.write(cmd.encode('ascii'))
@@ -46,28 +47,29 @@ def angle_to_gripper(angle_deg, angle_range=270, pos_min=50, pos_max=730):
 
 def main():
     index=2
-    arm_pos = [0.0] * 7
-    angle_pos = [0.0] * 7
-    zero_angles = [0.0] * 7
+    arm_pos = [0.0] * len(SERVO_IDS)
+    angle_pos = [0.0] * len(SERVO_IDS)
+    zero_angles = [0.0] * len(SERVO_IDS)
     with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0.01) as ser:
         print("Serial port opened")
 
         response = send_command(ser, f'#00{index}PVER!')
         
-        for i in range(7):
-            cmd = f'#00{i}PULK!'
+        for i in SERVO_IDS:
+            cmd = f'#{i:03d}PULK!'
             response = send_command(ser, cmd)
             print(f"Servo {i} torque released: {response.strip()}")
 
         print(f"Version response: {response.strip()}")
         while True:
-            for i in range(7):
-                cmd = f'#00{i}PRAD!'
+            for i in SERVO_IDS:
+                cmd = f'#{i:03d}PRAD!'
                 response = send_command(ser, cmd)
                 angle = pwm_to_angle(response.strip())
                 angle_pos[i] = angle
                 if angle is not None:
-                    angle_offset = angle - zero_angles[i]+init_qpos[i]
+                    init_offset = init_qpos[i] if i < len(init_qpos) else 0.0
+                    angle_offset = angle - zero_angles[i] + init_offset
                     angle_rad = np.radians(angle_offset)
                     arm_pos[i] = angle_rad
             print(angle_pos)

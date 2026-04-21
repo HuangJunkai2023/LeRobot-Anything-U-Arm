@@ -18,8 +18,8 @@ class ServoReaderNode:
         rospy.loginfo("Serial port opened")
 
         self.gripper_range = 0.48
-        self.zero_angles = [0.0] * 7
-        self.valid_servos = [0, 1, 2]  # Only use servos 0-2
+        self.valid_servos = list(range(8))
+        self.zero_angles = [0.0] * len(self.valid_servos)
         self._init_servos()
 
     def send_command(self, cmd):
@@ -47,8 +47,8 @@ class ServoReaderNode:
         rospy.loginfo("Servo initial angle calibration completed")
 
     def run(self):
-        angle_offset = [0.0] * 7  # Currently published angles
-        target_angle_offset = [0.0] * 7  # Target angle for each servo
+        angle_offset = [0.0] * len(self.valid_servos)  # Currently published angles
+        target_angle_offset = [0.0] * len(self.valid_servos)  # Target angle for each servo
         num_interp = 5  # Interpolation steps
         step_size = 1  # Minimum change threshold
 
@@ -65,7 +65,7 @@ class ServoReaderNode:
 
             # Interpolate towards target angles
             for step in range(num_interp):
-                for i in range(7):
+                for i in self.valid_servos:
                     delta = target_angle_offset[i] - angle_offset[i]
                     angle_offset[i] += delta * 0.2  # Lazy interpolation, coefficient < 1 for adjustable smoothness
                 self.pub.publish(Float64MultiArray(data=angle_offset))
